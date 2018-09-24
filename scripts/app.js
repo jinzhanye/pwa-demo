@@ -167,10 +167,28 @@
      * freshest data.
      */
     app.getForecast = function (key, label) {
-        var statement = 'select * from weather.forecast where woeid=' + key;
-        var url = 'https://query.yahooapis.com/v1/public/yql?format=json&q=' +
+        const statement = 'select * from weather.forecast where woeid=' + key;
+        const url = 'https://query.yahooapis.com/v1/public/yql?format=json&q=' +
             statement;
         // TODO add cache logic here
+        if ('caches' in window) {
+            /*
+             * Check if the service worker has already cached this city's weather
+             * data. If the service worker has the data, then display the cached
+             * data while the app fetches the latest data.
+             */
+            caches.match(url).then((response)=>  {
+                if (response) {
+                    response.json().then(function updateFromCache(json) {
+                        const results = json.query.results;
+                        results.key = key;
+                        results.label = label;
+                        results.created = json.query.created;
+                        app.updateForecastCard(results);
+                    });
+                }
+            });
+        }
 
         // Fetch the latest data.
         var request = new XMLHttpRequest();
@@ -344,5 +362,12 @@
         ];
         app.saveSelectedCities();
     }
-    // TODO add service worker code here
+
+    if('serviceWorker' in navigator){
+        navigator.serviceWorker
+            .register('./service-worker.js')
+            .then(() => {
+                console.log('Service Worker Registered');
+            });
+    }
 })();
